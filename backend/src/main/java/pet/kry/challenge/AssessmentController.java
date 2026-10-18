@@ -34,6 +34,15 @@ public class AssessmentController {
             !List.of("Chat", "Nurse", "Doctor").contains(request.recommendation())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid booking");
         }
-        return new BookingResponse(scheduling.book(request.slot()), request.slot(), request.recommendation());
+        try {
+            String confirmationId = scheduling.book(request.slot());
+            return new BookingResponse(confirmationId, request.slot(), request.recommendation());
+        } catch (BookingRejected e) {
+            // FULL = slot taken (conflict). PAST / INVALID = bad request.
+            HttpStatus status = e.reason() == BookingRejected.Reason.FULL
+                ? HttpStatus.CONFLICT
+                : HttpStatus.BAD_REQUEST;
+            throw new ResponseStatusException(status, e.getMessage());
+        }
     }
 }
