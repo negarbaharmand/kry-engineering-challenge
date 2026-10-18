@@ -13,9 +13,9 @@ public class AssessmentController {
     public AssessmentController(SchedulingService scheduling) { this.scheduling = scheduling; }
 
     public record AssessmentRequest(List<Integer> answers) {}
-    public record AssessmentResponse(int score, String recommendation, List<OffsetDateTime> availableSlots) {}
-    public record BookingRequest(OffsetDateTime slot, String recommendation) {}
-    public record BookingResponse(String confirmationId, OffsetDateTime slot, String recommendation) {}
+    public record AssessmentResponse(int score, Recommendation recommendation, List<OffsetDateTime> availableSlots) {}
+    public record BookingRequest(OffsetDateTime slot, Recommendation recommendation) {}
+    public record BookingResponse(String confirmationId, OffsetDateTime slot, Recommendation recommendation) {}
 
     @PostMapping("/assessment")
     public AssessmentResponse assess(@RequestBody AssessmentRequest request) {
@@ -24,18 +24,17 @@ public class AssessmentController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Provide five answers scored 1–3");
         }
         int score = request.answers().stream().mapToInt(Integer::intValue).sum();
-        String recommendation = score <= 7 ? "Chat" : score <= 11 ? "Nurse" : "Doctor";
-        return new AssessmentResponse(score, recommendation, scheduling.availableSlots());
+        Recommendation recommendation = Recommendation.fromScore(score);
+        return new AssessmentResponse(score, recommendation, scheduling.availableSlots(recommendation));
     }
 
     @PostMapping("/booking")
     public BookingResponse book(@RequestBody BookingRequest request) {
-        if (request == null || request.slot() == null || request.recommendation() == null ||
-            !List.of("Chat", "Nurse", "Doctor").contains(request.recommendation())) {
+        if (request == null || request.slot() == null || request.recommendation() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid booking");
         }
         try {
-            String confirmationId = scheduling.book(request.slot());
+            String confirmationId = scheduling.book(request.slot(), request.recommendation());
             return new BookingResponse(confirmationId, request.slot(), request.recommendation());
         } catch (BookingRejected e) {
             // FULL = slot taken (conflict). PAST / INVALID = bad request.
@@ -43,6 +42,9 @@ public class AssessmentController {
                 ? HttpStatus.CONFLICT
                 : HttpStatus.BAD_REQUEST;
             throw new ResponseStatusException(status, e.getMessage());
+        } catch (IllegalArgumentException e) {
+            // Unknown recommendation label from JSON (e.g. "Doctr").
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid booking");
         }
     }
 }
