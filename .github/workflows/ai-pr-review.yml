@@ -1,0 +1,25 @@
+# *********************************
+# THIS FILE IS MANAGED BY TERRAFORM - KRY-FLEET-MANAGEMENT
+# *********************************
+
+name: AI PR Review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+  workflow_dispatch:
+
+concurrency:
+  group: ai-pr-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  pull-requests: write
+  contents: read
+  id-token: write
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    uses: webbhalsa/gha-pr-reviewer/.github/workflows/pr-reviewer.yml@main
+    secrets: inherit
