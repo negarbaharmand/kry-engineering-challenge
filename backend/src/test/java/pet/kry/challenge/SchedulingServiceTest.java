@@ -25,4 +25,17 @@ class SchedulingServiceTest {
         assertFalse(scheduling.availableSlots().contains(stockholmForm),
             "Booking the UTC form should consume the Stockholm slot (same Instant)");
     }
+
+    @Test void secondBookingOfFullSlotIsRejected() {
+        OffsetDateTime opening = OffsetDateTime.parse("2026-10-12T08:00:00+02:00");
+        scheduling.book(opening);
+        BookingRejected error = assertThrows(BookingRejected.class, () -> scheduling.book(opening));
+        assertEquals(BookingRejected.Reason.FULL, error.reason());
+    }
+
+    @Test void bookingPastSlotIsRejected() {
+        OffsetDateTime past = OffsetDateTime.parse("2026-10-12T07:45:00+02:00");
+        BookingRejected error = assertThrows(BookingRejected.class, () -> scheduling.book(past));
+        assertEquals(BookingRejected.Reason.PAST, error.reason());
+    }
 }

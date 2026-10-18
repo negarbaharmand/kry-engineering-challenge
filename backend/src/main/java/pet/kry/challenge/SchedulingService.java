@@ -46,9 +46,38 @@ public class SchedulingService {
         return available;
     }
 
-    public String book(OffsetDateTime slot) {
-        // Always store by Instant so UTC and Stockholm writings hit the same key.
-        booked.merge(slot.toInstant(), 1, Integer::sum);
+    /**
+     * synchronized = only one thread runs this method at a time on this service instance.
+     * That way two requests cannot both pass the "is there a free seat?" check and overbook.
+     */
+    public synchronized String book(OffsetDateTime slot) {
+        Instant when = slot.toInstant();
+
+        // 1) Refuse times already in the past (compared to our clock).
+        if (when.isBefore(clock.instant())) {
+            throw new BookingRejected(BookingRejected.Reason.PAST);
+        }
+
+        // 2) Interpret the moment in the clinic timezone to check the local wall clock.
+        LocalTime time = when.atZone(CLINIC_ZONE).toLocalTime();
+        boolean onGrid = time.getMinute() % 15 == 0
+            && time.getSecond() == 0
+            && time.getNano() == 0
+            && !time.isBefore(LocalTime.of(8, 0))
+            && time.isBefore(LocalTime.of(18, 0));
+        int capacity = activeClinicians(time);
+        if (!onGrid || capacity == 0) {
+            throw new BookingRejected(BookingRejected.Reason.INVALID);
+        }
+
+        // 3) Refuse if every seat at this moment is already taken.
+        int alreadyBooked = booked.getOrDefault(when, 0);
+        if (alreadyBooked >= capacity) {
+            throw new BookingRejected(BookingRejected.Reason.FULL);
+        }
+
+        // 4) Reserve one seat. Instant key = UTC and Stockholm writings share capacity.
+        booked.merge(when, 1, Integer::sum);
         return UUID.randomUUID().toString();
     }
 }
