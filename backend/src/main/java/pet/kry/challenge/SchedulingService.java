@@ -38,8 +38,11 @@ public class SchedulingService {
             LocalTime breakStart = start.plusHours(4);
             LocalTime breakEnd = breakStart.plusHours(1);
             LocalTime finish = start.plusHours(9);
-            if (!time.isBefore(start) && !time.isAfter(finish) &&
-                (time.isBefore(breakStart) || !time.isBefore(breakEnd))) {
+
+            // Morning: [start, breakStart)   Afternoon: [breakEnd, finish)
+            boolean morning = !time.isBefore(start) && time.isBefore(breakStart);
+            boolean afternoon = !time.isBefore(breakEnd) && time.isBefore(finish);
+            if (morning || afternoon) {
                 available++;
             }
         }

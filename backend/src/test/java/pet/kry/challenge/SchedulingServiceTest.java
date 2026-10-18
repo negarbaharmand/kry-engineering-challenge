@@ -38,4 +38,9 @@ class SchedulingServiceTest {
         BookingRejected error = assertThrows(BookingRejected.class, () -> scheduling.book(past));
         assertEquals(BookingRejected.Reason.PAST, error.reason());
     }
+
+    @Test void capacityDropsAtShiftEnd() {
+        assertEquals(3, scheduling.activeClinicians(LocalTime.of(17, 0)));
+        assertEquals(2, scheduling.activeClinicians(LocalTime.of(17, 30)));
+    }
 }
